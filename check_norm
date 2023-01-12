@@ -1,0 +1,155 @@
+# ====================================================================================
+#
+# Проверка нормального закона результирующего распределения выходной 
+# характеристики качества процесса для расчёта индексов возможностей.
+# Провека выполняется графически с использованием гистограммы с наложенной на неё
+# кривой функции плотности нормального закона и с помощью квантильного графика.
+# При построении гистограммы, ширина интервалов группировки определяется по методике,
+# приведённой в Scott(1979), а кривая функции плотности нормального закона вычисляется
+# с параметрами,оценёнными по данным.
+# Формализованная проверка нормального распределения выполняется с использованием 
+# критерия согласия Шапиро-Уилка и Андерсона-Дарлинга.
+# 
+# Входным аргументом функции должен быть объект класса "qcc", возвращаемый 
+# функцией qcc::qcc() в результате построения контрольной карты, для проверки 
+# стабильного состояния процесса.
+# Ещё одним входным аргументом функции явлется disp.con принимающий логическое
+# значение и используемый для указания необходимости вывода в консоль результатов 
+# проверки нормального закона по формальным критериям (по умолчанию вывод в консоль
+# подавляется и все результаты выводятся в окно просмотра).
+#
+# Литература:
+#  Scott D.W. (1979) On Optimal and Data-Based Histograms. Biometrika, Vol. 66,
+#  No. 3, pp. 605-610.
+#  
+# ===================================================================================
+# Создан: ФГБОУ "Брянский государственный технический университет"
+#  Автор: Н.М. Борбаць, Т.В. Школина
+# E-mail: borbact@mail.ru; shkolina.tv@yandex.ru
+# ===================================================================================
+
+# необходимые пакеты
+library(qcc)
+library(tidyverse)
+library(nortest)
+library(patchwork)
+
+
+check_norm <- function(object, disp.con = FALSE) {
+  if ((missing(object)) || (!inherits(object, "qcc"))) {
+    stop("Требуется объект класса 'qcc'.")
+  }
+  stopifnot(is.logical(disp.con), length(disp.con) == 1)
+  
+  df <- as.data.frame(object$data) %>%
+    mutate(sample = as.integer(row.names(object$data))) %>% 
+    pivot_longer(!sample,
+                 names_to = "temp",
+                 values_to = "data",
+                 values_drop_na = TRUE) %>% 
+    select(!temp)
+  
+  n <- length(df$data)
+  mu <- mean(df$data)
+  sigma <- sd(df$data)
+  
+  # построение гистограммы с кривой pdf
+  h <- 3.5*sigma*n^(-1/3)
+  if (h > 0) {
+    bins <- max(1, ceiling(diff(range(df$data))/h))
+  } else bins <- 1L
+  
+  fig1 <- ggplot(df, aes(data)) +
+    geom_histogram(bins = bins, fill = "dodgerblue3", color = "white") +
+    scale_y_discrete(name = NULL, breaks = NULL, labels = NULL) +
+    theme(panel.background = element_blank(),
+          axis.line.x = element_line(linewidth = 0.5),
+          plot.title = element_text(hjust = 0.5),
+          plot.margin = unit(c(0, 5, 0, 5), 'mm')) +
+    labs(title = "Histogram with normal pdf", x = object$data.name)
+  
+  zmin <- mu - 3*sigma
+  zmax <- mu + 3*sigma
+  dfn <- tibble(
+    z = seq(zmin, zmax, length.out = 1000),
+    pdf_n = dnorm(z, mu, sigma)
+  )
+  
+  fig2 <- geom_line(data = dfn, aes(z, pdf_n*h*n),
+                    color = "red", linewidth = 1.1)
+  
+  fig12 <- fig1 + fig2
+  
+  # построение нормального вероятностного графика
+  fig3 <- ggplot(df, aes(sample = data)) +
+    stat_qq(aes(x = after_stat(sample), y = after_stat(theoretical)),
+            shape = 21, color = "blue", fill = "white", 
+            size = 2, alpha = 1/2) +
+    stat_qq_line(aes(x = after_stat(y), y = after_stat(x)),
+                 color = "red", linewidth = 0.75) + 
+    theme_light() +
+    labs(title = "Normal Q-Q plot", x = "Sample quantiles",
+         y = "Theoretical quantiles") +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.margin = unit(c(0, 5, 0, 5), 'mm'))
+  
+  # проверка по критерию Шапиро-Уилка
+  testW_result <- shapiro.test(df$data)
+  
+  dft <- tibble(
+    x = seq(1, 10),
+    y = seq(1, 10)
+  )
+  
+  fig4 <- ggplot(dft, aes(x = x, y = y)) +
+    scale_x_continuous(limits = c(min(dft$x), max(dft$x)),
+                       name = NULL, breaks = NULL, labels = NULL) +
+    scale_y_continuous(limits = c(min(dft$y), max(dft$y)),
+                       name = NULL, breaks = NULL, labels = NULL) +
+    theme(panel.background = element_blank()) +
+    annotate("text", x = 5.5, y = 9, label = testW_result$method,
+             fontface = "bold", size = 12/.pt) +
+    annotate("text", x = 3, y = 7, 
+             label = paste("data:", object$data.name), size = 11/.pt) +
+    annotate("text", x = 2.5, y = 5, 
+             label = sprintf("W = %.4g", testW_result$statistic[["W"]]),
+             size = 11/.pt) +
+    annotate("text", x = 6.5, y = 5, 
+             label = sprintf("p-value = %.4g", testW_result[["p.value"]]),
+             size = 11/.pt)
+  
+  # проверка по критерию Андерсона-Дарлинга
+  testA_result <- ad.test(df$data)
+  
+  fig5 <- ggplot(dft, aes(x = x, y = y)) +
+    scale_x_continuous(limits = c(min(dft$x), max(dft$x)),
+                       name = NULL, breaks = NULL, labels = NULL) +
+    scale_y_continuous(limits = c(min(dft$y), max(dft$y)),
+                       name = NULL, breaks = NULL, labels = NULL) +
+    theme(panel.background = element_blank()) +
+    annotate("text", x = 5.5, y = 9, label = testA_result$method,
+             fontface = "bold", size = 12/.pt) +
+    annotate("text", x = 3, y = 7, 
+             label = paste("data:", object$data.name), size = 11/.pt) +
+    annotate("text", x = 2.5, y = 5, 
+             label = sprintf("A = %.4g", testA_result[["statistic"]]),
+             size = 11/.pt) +
+    annotate("text", x = 6.5, y = 5, 
+             label = sprintf("p-value = %.4g", testA_result[["p.value"]]),
+             size = 11/.pt)
+
+  # сборка графика и вывод на графическое устройство
+  layout <- "
+  AAABBB
+  AAABBB
+  CCCDDD
+  "
+  res_fig <- wrap_plots(fig12, fig3, fig4, fig5) + plot_layout(design = layout)
+  plot(res_fig)
+  
+  # вывод в консоль, если требуется
+  if (disp.con) {
+    print(testW_result)
+    print(testA_result)
+  }
+}
