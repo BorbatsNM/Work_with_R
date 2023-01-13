@@ -112,10 +112,10 @@ check_norm <- function(object, disp.con = FALSE) {
     annotate("text", x = 3, y = 7, 
              label = paste("data:", object$data.name), size = 11/.pt) +
     annotate("text", x = 2.5, y = 5, 
-             label = sprintf("W = %.4g", testW_result$statistic[["W"]]),
+             label = sprintf("W = %.4f", testW_result$statistic[["W"]]),
              size = 11/.pt) +
     annotate("text", x = 6.5, y = 5, 
-             label = sprintf("p-value = %.4g", testW_result[["p.value"]]),
+             label = sprintf("p-value = %.4f", testW_result[["p.value"]]),
              size = 11/.pt)
   
   # проверка по критерию Андерсона-Дарлинга
@@ -132,10 +132,10 @@ check_norm <- function(object, disp.con = FALSE) {
     annotate("text", x = 3, y = 7, 
              label = paste("data:", object$data.name), size = 11/.pt) +
     annotate("text", x = 2.5, y = 5, 
-             label = sprintf("A = %.4g", testA_result[["statistic"]]),
+             label = sprintf("A = %.4f", testA_result[["statistic"]]),
              size = 11/.pt) +
     annotate("text", x = 6.5, y = 5, 
-             label = sprintf("p-value = %.4g", testA_result[["p.value"]]),
+             label = sprintf("p-value = %.4f", testA_result[["p.value"]]),
              size = 11/.pt)
 
   # сборка графика и вывод на графическое устройство
