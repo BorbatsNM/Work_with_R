@@ -26,7 +26,7 @@
 
 result_SV_sigma <- function(data, limits, sigma, k, na.rm = FALSE) {
   stopifnot(exprs = {
-    is.vector(x, mode = "numeric")
+    is.vector(data, mode = "numeric")
     length(limits) == 2
     length(sigma) == 1
     length(k) == 1
